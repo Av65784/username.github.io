@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Grow & Study! (AI Motivation Student Site)</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f8ffe5; margin:0; }
+    .section { margin: 28px auto; max-width: 430px; background: #fff; border: 1.5px solid #b2dfdb; padding: 18px 24px 20px 24px; border-radius: 18px; box-shadow: 0 0 6px #b2dfdb33; }
+    #plant { font-size: 5em; margin: 22px 0 8px 0; transition:0.3s; }
+    input, button, select, textarea { margin: 7px 2px 7px 0; padding: 7px 8px; font-size: 1em; border-radius: 7px; border: 1px solid #95a5a6; }
+    button { cursor:pointer; background: #a2f3c3; border:none; }
+    textarea { width:96%; resize:none; font-family:inherit;}
+    #status { margin: 8px 0 0 0; font-weight: bold; color: #009688;}
+    #coinsBox { margin: 13px 0 0 0;}
+    #testQuestions { margin-top: 4px; }
+    #wiltNotice { color:#ee5253; font-weight:bold;}
+    #resourceTest, #chatWindow { margin-top: 7px;}
+    #resourceStatus { color:#009688; font-size:0.95em;}
+    #chatWindow { border:1px solid #ccc; height:115px; overflow:auto; background:#fff; padding:8px; border-radius:8px;}
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center; margin-top:18px;">Grow & Study! 🌳🐰</h1>
+
+  <div class="section">
+    <h2>Study Timer</h2>
+    <label for="minutes">How long? </label>
+    <input id="minutes" type="number" min="5" max="120" value="25"/> minutes
+    <button onclick="startStudy()">Start Study Session</button>
+    <div id="plant">🌱</div>
+    <div id="status"></div>
+    <div id="wiltNotice"></div>
+    <div id="coinsBox">Coins: <span id="coins">0</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Upload Study Resource</h2>
+    <textarea id="resourceText" rows="6" placeholder="Paste notes, study guide, facts, etc."></textarea><br>
+    <button onclick="saveResource()">Save Resource</button>
+    <span id="resourceStatus"></span>
+    <br><button onclick="generateMockTest()">Generate Test from Resource</button>
+    <div id="resourceTest"></div>
+  </div>
+
+  <div class="section">
+    <h2>Study Chatbot</h2>
+    <div id="chatWindow"></div>
+    <input id="chatInput" placeholder="Ask a question..."/>
+    <button onclick="sendChat()">Send</button>
+    <div style="font-size:0.9em;color:#666;margin-top:2px;">
+      <b>Tip:</b> The chatbot will not use real AI, but you can expand it or connect to OpenAI API.<br>
+      <b>Every time you use chatbot during an active session, the plant wilts!</b>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Mock Test Demo (Manual Topic)</h2>
+    <input id="testTopic" placeholder="Enter topic"/>
+    <button onclick="makeTest()">Manual Demo Test</button>
+    <div id="testQuestions"></div>
+    <button onclick="submitTest()">Submit Test</button>
+    <div id="testFeedback"></div>
+  </div>
+
+<script>
+/* --- Local db (localStorage) helpers --- */
+function saveProgress() {
+  localStorage.setItem('coins', coins);
+  localStorage.setItem('plant', document.getElementById('plant').innerText);
+  localStorage.setItem('wilt', wilt);
+  localStorage.setItem('resource', document.getElementById('resourceText').value);
+}
+function loadProgress() {
+  let c = localStorage.getItem('coins');
+  let p = localStorage.getItem('plant');
+  let w = localStorage.getItem('wilt');
+  let r = localStorage.getItem('resource');
+  if(c) { coins = parseInt(c); document.getElementById('coins').innerText = coins; }
+  if(p) { document.getElementById('plant').innerText = p; }
+  if(w) { wilt = parseInt(w); }
+  if(r) { document.getElementById('resourceText').value = r; }
+}
+
+/* --- Study timer and plant logic --- */
+let timer, timeLeft, coins = 0, wilt = 0, sessionActive = false;
+window.onload = function() { loadProgress(); };
+
+function startStudy(){
+  clearInterval(timer); 
+  wilt = 0; sessionActive = true;
+  let mins = parseInt(document.getElementById('minutes').value);
+  timeLeft = mins * 60;
+  document.getElementById('status').innerText = 'Studying...';
+  document.getElementById('plant').innerText = '🌱';
+  document.getElementById('wiltNotice').innerText = '';
+  timer = setInterval(() => {
+    timeLeft--;
+    if(timeLeft <= 0) {
+      clearInterval(timer);
+      sessionActive = false;
+      // Plant health and reward
+      let healthy = wilt < 3;
+      document.getElementById('plant').innerText = healthy ? '🌳' : '🍂';
+      document.getElementById('status').innerText = healthy 
+        ? 'Great job! You finished! Plant is happy.'
+        : 'Study done, but try to use less chatbot!';
+      let bonus = Math.max(1, 5-wilt);
+      coins += bonus; // Reward goes down with chatbot use
+      document.getElementById('coins').innerText = coins;
+      saveProgress();
+      document.getElementById('wiltNotice').innerText = '';
+    }
+    saveProgress();
+  }, 1000);
+  window.onbeforeunload = () => "Leaving now will wilt your plant!";
+  saveProgress();
+}
+
+function useChatWilt(){
+  if(!sessionActive) return;
+  wilt++;
+  let plantStage = wilt == 1 ? '🌿' : wilt == 2 ? '🍃' : '🍂';
+  document.getElementById('plant').innerText = plantStage;
+  if(wilt == 1) document.getElementById('wiltNotice').innerText = "Plant's a bit droopy, focus more!";
+  if(wilt == 2) document.getElementById('wiltNotice').innerText = "Plant losing more leaves!";
+  if(wilt >=3) document.getElementById('wiltNotice').innerText = "Plant wilted! Try using chatbot less!";
+  saveProgress();
+}
+
+/* --- Practice/Mock test (DEMO only) --- */
+function makeTest(){
+  let topic = document.getElementById('testTopic').value || 'General';
+  let qs = [
+    `What is 2+2? <input id="q1"/>`,
+    `Define gravity. <input id="q2"/>`
+  ];
+  document.getElementById('testQuestions').innerHTML =
+    `<b>Test on: ${topic}</b><br>1. ${qs[0]}<br>2. ${qs[1]}`;
+  document.getElementById('testFeedback').innerText = "";
+}
+function submitTest(){
+  let s = 0;
+  if(document.getElementById('q1') && document.getElementById('q1').value.trim() == '4') s++;
+  if(document.getElementById('q2') && document.getElementById('q2').value.toLowerCase().includes('force')) s++;
+  document.getElementById('testFeedback').innerText = "Your Score: " + s + "/2. " + (s == 2 ? "Awesome!" : "Keep practicing!");
+  coins += s; document.getElementById('coins').innerText = coins; saveProgress();
+}
+
+/* --- Resource Upload & Auto Mock Test from Resource --- */
+function saveResource(){
+  let resource = document.getElementById('resourceText').value;
+  if(resource.trim().length == 0) return;
+  localStorage.setItem('resource', resource);
+  document.getElementById('resourceStatus').innerText = "Saved!";
+  saveProgress();
+}
+function generateMockTest(){
+  let resource = localStorage.getItem('resource');
+  if(!resource) {
+    document.getElementById('resourceTest').innerText = "No resource uploaded!";
+    return;
+  }
+  let questions = [];
+  let lines = resource.split('. ');
+  for(let i=0; i<Math.min(3,lines.length); i++){
+    let q = lines[i].trim();
+    if(q.length > 0) {
+      // Make a fill-in-the-blank from a keyword
+      let blanked = q.replace(/(\b[A-Za-z]{5,}\b)/, "____");
+      questions.push("Q" + (i+1) + ": " + blanked + " ?");
+    }
+  }
+  let html = "<b>Your Auto-Test:</b><br>";
+  questions.forEach((q,j) => html += q + ` <input id="resq${j}" /><br>`);
+  document.getElementById('resourceTest').innerHTML = html;
+}
+
+/* --- Basic Chatbot --- */
+function sendChat(){
+  let msg = document.getElementById('chatInput').value;
+  if(!msg.trim()) return;
+  let chatWin = document.getElementById('chatWindow');
+  chatWin.innerHTML += `<div><b>You:</b> ${msg}</div>`;
+  setTimeout(()=>{
+    // Simulated bot response—expand or connect to OpenAI API for real
+    chatWin.innerHTML += `<div><b>Bot:</b> Here's a helpful response about "${msg}"!</div>`;
+    chatWin.scrollTop = chatWin.scrollHeight;
+  }, 600);
+  document.getElementById('chatInput').value = "";
+  useChatWilt(); // Each use wilts the plant during study
+}
+
+</script>   
+<script src="//code.tidio.co/5e0eclcop5akpa638nh5pohzixj59upu.js" async></script>
+</body>
+</html>
